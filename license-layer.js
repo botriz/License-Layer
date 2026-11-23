@@ -1,31 +1,24 @@
-import { identity } from "suraya-global-intelligence-core/suraya-identity.js";
-import { isLocked, isSavior } from "suraya-global-intelligence-core/suraya-lock.js";
-
-export function checkLicense(domain) {
-  const core = identity();
-
-  if (isSavior()) {
-    return {
-      mode: "SAVIOR",
-      domain,
-      unlimited: true,
-      note: "License unlocked by Savior."
-    };
+/**
+ * Deterministic license check. Entitlements must come from a trusted,
+ * server-verified source; this module does not authenticate users or unlock itself.
+ */
+export function checkLicense(domain, { licensedDomains = [], locked = false } = {}) {
+  if (typeof domain !== "string" || !domain.trim() || domain.length > 253) {
+    throw new TypeError("A valid license domain is required.");
   }
-
-  if (isLocked()) {
-    return {
-      mode: "LOCKED",
-      domain,
-      unlimited: false,
-      note: "License locked by core."
-    };
+  if (!Array.isArray(licensedDomains) || licensedDomains.some(value => typeof value !== "string")) {
+    throw new TypeError("licensedDomains must be an array of strings.");
   }
-
+  const normalizedDomain = domain.trim().toLowerCase();
+  if (locked) {
+    return { mode: "LOCKED", domain: normalizedDomain, valid: false, unlimited: false, note: "License access is blocked by policy." };
+  }
+  const valid = licensedDomains.some(value => value.trim().toLowerCase() === normalizedDomain);
   return {
-    mode: "NORMAL",
-    domain,
+    mode: valid ? "VALID" : "UNLICENSED",
+    domain: normalizedDomain,
+    valid,
     unlimited: false,
-    note: "License valid."
+    note: valid ? "A matching entitlement was supplied by the caller." : "No matching entitlement was supplied."
   };
 }
